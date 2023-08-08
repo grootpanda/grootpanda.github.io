@@ -22,86 +22,103 @@
  <div class="code-block">
       <pre>
         <code>
-          #Generation of random numbers as message bits
           import numpy as np
-          import matplotlib.pyplot as plt
-          N=100 #number of message bits
-          Z=np.random.rand(N,1)>0.5 #uniform random variable
-          Y= np.multiply(np.random.rand(N,1)>0.5,1)
-          X=2*Y-1 #uniform random variable in range [0,1]
-          plt.plot(X)
+import matplotlib.pyplot as plt
+#pulse gen
+t=np.linspace(0,1,500) #gen time smaple
+x=1+ np.sin(2*np.pi*10*t) #sin of freq 10hz
+plt.plot(t,x) ;
 
-          #Pulse shaping and matched filtering
-          N=10
-          upsamp=4
-          mess_bits=2*np.multiply(np.random.rand(N,1)>0.5,1)-1
-          out_mess=np.kron(mess_bits, [1,0,0,0]).reshape(upsamp*N,)
-          print(out_mess)
+#Quantization of the signal
 
-          #Pulse shaping and matched filtering
-          N=10
-          upsamp=4
-          mess_bits=2*np.multiply(np.random.rand(N,1)>0.5,1)-1
-          out_mess=np.kron(mess_bits, [1,0,0,0]).reshape(upsamp*N,)
-          print(out_mess)
+L=4 #number of quantization levels
+X_min=np.min(x)
+X_max=np.max(x)
+#boundary regions
+b = np.zeros((L+1,))
+b[0]=X_min
+b[L]=X_max
+step_size=(X_max-X_min)/L
 
-          def raised_root_cosine(upsample, num_positive_lobes, alpha):
-              """
-              Root raised cosine (RRC) filter (FIR) impulse response.
-              upsample: number of samples per symbol
-              num_positive_lobes: number of positive overlapping symbols
-              length of filter is 2 * num_positive_lobes + 1 samples
-              alpha: roll-off factor
-              """
-              N = upsample * (num_positive_lobes * 2 + 1)
-              t = (np.arange(N) - N / 2) / upsample
+#boundary region
+for k in np.arange(1,L):
+  b[k]=b[0]+k*step_size   #defining bounderies with step size
+z=np.zeros_like(x)  #quantized signals
+cnt=-1   #counter
+for y in x:
+  cnt=cnt+1 #counter increment
+  for k in np.arange(1,L+1):
+    if(y>=b[k-1])&(y<=b[k]):  #identifying boundaries
+     z[cnt]=(b[k-1]+b[k])/2   #defining levels
+     break
 
-              # result vector
-              h_rrc = np.zeros(t.size, dtype=np.float)
-              # index for special cases
-              sample_i = np.zeros(t.size, dtype=np.bool)
-              # deal with special cases
-              subi = t == 0
-              sample_i = np.bitwise_or(sample_i, subi)
-              h_rrc[subi] = 1.0 - alpha + (4 * alpha / np.pi)
-              subi = np.abs(t) == 1 / (4 * alpha)
-              sample_i = np.bitwise_or(sample_i, subi)
-              h_rrc[subi] = (alpha / np.sqrt(2)) * (((1 + 2 / np.pi) * (np.sin(np.pi / (4 * alpha))))
-                            + ((1 - 2 / np.pi) * (np.cos(np.pi / (4 * alpha)))))
+plt.subplot(121)
+plt.stem(t,x)
+plt.subplot(122)
+plt.stem(t,z);
 
-              # base case
-              sample_i = np.bitwise_not(sample_i)
-              ti = t[sample_i]
-              h_rrc[sample_i] = np.sin(np.pi * ti * (1 - alpha)) + 4 * alpha * ti * np.cos(np.pi * ti * (1 + alpha));
-              h_rrc[sample_i] /= (np.pi * ti * (1 - (4 * alpha * ti) ** 2))
-              return h_rrc
-          p = raised_root_cosine(4,3,0.4)
-          plt.plot(p)
-          print(np.shape(p))
 
-          #plot of the resultant signal
-          cc = np.convolve(out_mess,p)
-          #convolve message bits with the pulse shape
-          cc_AWGN = cc + 0.5*np.random.randn(np.size(cc))
-          #additive white Gaussian noise
-          plt.plot(cc_AWGN)
-          #Matched filtering
-          cc_MF = np.convolve(cc_AWGN,p)
-          plt.plot(cc_MF)
 
-          #sample the signal and compare against message sequence
-          m=0
-          db= []
-          for b in mess_bits:
-              start = (m+7)*upsamp
-              m = m+1
-              if cc_MF[start] > 0:
-                  db.append(1)
-              else:
-                  db.append(-1)
-          print(db)
-          print(mess_bits.reshape(10,))
-        </code>
+SNR =np.zeros((10,))
+cc=0
+for L in np.arange(1,11):
+  X_min=np.min(x)
+  X_max=np.max(x)
+  #boundary regions
+  b = np.zeros((L+1,))
+  b[0]=X_min
+  b[L]=X_max
+  step_size=(X_max-X_min)/L
+
+  #boundary region
+  for k in np.arange(1,L):
+    b[k]=b[0]+k*step_size   #defining bounderies with step size
+  z=np.zeros_like(x)  #quantized signals
+  cnt=-1   #counter
+  for y in x:
+    cnt=cnt+1 #counter increment
+    for k in np.arange(1,L+1):
+      if(y>=b[k-1])&(y<=b[k]):  #identifying boundaries
+       z[cnt]=(b[k-1]+b[k])/2   #defining levels
+       break
+  signal_power =np.sum(x**2)
+  noise_power =np.sum((z-x)**2)
+  SNR[cc] = signal_power/noise_power
+  cc =cc +1
+  plt.plot(np.log(np.arange(1,11))/np.log(2),10*np.log(SNR)/np.log(2))
+  plt.xlabel("number of bits")
+  plt.ylabel("SNR in db")
+
+
+SNR =np.zeros((10,))
+cc=0
+for L in np.arange(1,11):
+  X_min=np.min(x)
+  X_max=np.max(x)
+  #boundary regions
+  b = np.zeros((L+1,))
+  b[0]=X_min
+  b[L]=X_max
+  step_size=(X_max-X_min)/L
+
+  #boundary region
+  for k in np.arange(1,L):
+    b[k]=b[0]+k*step_size   #defining bounderies with step size
+  z=np.zeros_like(x)  #quantized signals
+  cnt=-1   #counter
+  for y in x:
+    cnt=cnt+1 #counter increment
+    for k in np.arange(1,L+1):
+      if(y>=b[k-1])&(y<=b[k]):  #identifying boundaries
+       z[cnt]=(b[k-1]+b[k])/2   #defining levels
+       break
+  signal_power =np.sum(x**2)
+  noise_power =np.sum((z-x)**2)
+  SNR[cc] = signal_power/noise_power
+  cc =cc +1
+plt.plot(x)
+plt.plot(z)
+      </code>
       </pre>
     </div>
   </main>
